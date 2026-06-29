@@ -1,8 +1,8 @@
 package aquisito_broster_api.controller;
 
 import aquisito_broster_api.dto.common.ApiResponse;
-import aquisito_broster_api.dto.inventario.InsumoResponse;
-import aquisito_broster_api.dto.inventario.MovimientoInventarioRequest;
+import aquisito_broster_api.dto.request.InsumoMovimientoRequest;
+import aquisito_broster_api.dto.response.InsumoResponse;
 import aquisito_broster_api.dto.response.MovimientoInventarioResponse;
 import aquisito_broster_api.dto.response.RecetaItemResponse;
 import aquisito_broster_api.service.InventarioService;
@@ -43,7 +43,7 @@ public class InventarioController {
     }
 
     @PostMapping("/movimientos")
-    public ApiResponse<MovimientoInventarioResponse> registrarMovimiento(@Valid @RequestBody MovimientoInventarioRequest request, Authentication authentication) {
+    public ApiResponse<MovimientoInventarioResponse> registrarMovimiento(@Valid @RequestBody InsumoMovimientoRequest request, Authentication authentication) {
         return new ApiResponse<>(true, inventarioService.registerMovement(request, authentication.getName()), "Movimiento registrado");
     }
 }

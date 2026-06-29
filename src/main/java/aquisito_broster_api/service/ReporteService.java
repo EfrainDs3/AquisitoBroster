@@ -1,6 +1,6 @@
 package aquisito_broster_api.service;
 
-import aquisito_broster_api.dto.response.ReporteResumenResponse;
+import aquisito_broster_api.dto.reporte.ReporteResumenResponse;
 
 public interface ReporteService {
 

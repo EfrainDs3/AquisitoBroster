@@ -20,7 +20,7 @@ public class ProductoServiceImpl implements ProductoService {
     }
 
     @Override
-    public List<ProductoResponse> listar() {
+    public List<ProductoResponse> listAll() {
         return productoRepository.findAll().stream().map(this::toResponse).toList();
     }
 

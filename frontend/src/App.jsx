@@ -28,6 +28,7 @@ import { Line } from 'react-chartjs-2';
 import LoginScreen from './components/LoginScreen.jsx';
 import PosView from './components/PosView.jsx';
 import { clearStoredAuth, getStoredAuth, hasBackendConfigured, loginWithJwt, saveStoredAuth } from './services/authService.js';
+import { getProductos, getInsumos, getMovimientos, getPedidos, getCajaEstado, getResumenDiario } from './services/apiService.js';
 import { 
   Chart as ChartJS, 
   CategoryScale, 
@@ -194,34 +195,111 @@ export default function App() {
 
   // --- 2. CARGA Y PERSISTENCIA ---
   useEffect(() => {
-    const savedState = localStorage.getItem('aquicito_broaster_react_state');
-    if (savedState) {
-      const parsed = JSON.parse(savedState);
-      setInsumos(parsed.insumos);
-      setProductos(parsed.productos);
-      setRecetas(parsed.recetas);
-      setPedidos(parsed.pedidos);
-      setMovimientos(parsed.movimientos);
-      setCajaSesiones(parsed.cajaSesiones);
-      
-      const activa = parsed.cajaSesiones.find(s => s.estado === 'ABIERTA');
-      setCajaActiva(activa || null);
-    } else {
-      setInsumos([...DEFAULT_INSUMOS]);
-      setProductos([...DEFAULT_PRODUCTS]);
-      setRecetas({...DEFAULT_RECIPES});
-      setPedidos([...INITIAL_ORDERS]);
-      setMovimientos([...INITIAL_MOVIMIENTOS]);
-      setCajaSesiones([...INITIAL_CAJA_HISTORY]);
-      setCajaActiva(null);
-    }
+    const loadInitialData = async () => {
+      const savedState = localStorage.getItem('aquicito_broaster_react_state');
+      if (savedState) {
+        const parsed = JSON.parse(savedState);
+        setInsumos(parsed.insumos || [...DEFAULT_INSUMOS]);
+        setProductos(parsed.productos || [...DEFAULT_PRODUCTS]);
+        setRecetas(parsed.recetas || {...DEFAULT_RECIPES});
+        setPedidos(parsed.pedidos || [...INITIAL_ORDERS]);
+        setMovimientos(parsed.movimientos || [...INITIAL_MOVIMIENTOS]);
+        setCajaSesiones(parsed.cajaSesiones || [...INITIAL_CAJA_HISTORY]);
+        
+        const activa = (parsed.cajaSesiones || []).find(s => s.estado === 'ABIERTA');
+        setCajaActiva(activa || null);
+      } else {
+        try {
+          const [productosApi, insumosApi, pedidosApi, movimientosApi, cajaApi, resumenApi] = await Promise.all([
+            getProductos(),
+            getInsumos(),
+            getPedidos(),
+            getMovimientos(),
+            getCajaEstado(),
+            getResumenDiario()
+          ]);
 
-    const storedAuth = getStoredAuth();
-    if (storedAuth?.user) {
-      setCurrentUser(storedAuth.user);
-      setIsLoggedIn(true);
-      setActiveView(storedAuth.user.rol === 'ADMIN' ? 'reports' : 'pos');
-    }
+          const mappedProductos = (productosApi || []).map(p => ({
+            id: p.id,
+            nombre: p.nombre,
+            desc: p.descripcion || p.desc,
+            precio: Number(p.precio || 0),
+            categoria: p.categoria || 'general'
+          }));
+
+          const mappedInsumos = (insumosApi || []).map(i => ({
+            id: i.id,
+            nombre: i.nombre,
+            stock_actual: Number(i.stockActual || 0),
+            stock_minimo: Number(i.stockMinimo || 0),
+            unidad_medida: i.unidadMedida || 'UNIDAD'
+          }));
+
+          const mappedPedidos = (pedidosApi || []).map(p => ({
+            id: p.id,
+            fecha: p.fecha ? new Date(p.fecha).toLocaleString('es-PE') : 'Reciente',
+            cliente: p.cliente || 'Cliente General',
+            estado: p.estado,
+            total: Number(p.total || 0),
+            items: (p.items || []).map(it => ({
+              id: it.id,
+              nombre: it.nombre,
+              precio: Number(it.precio || 0),
+              qty: it.cantidad || it.qty || 1
+            }))
+          }));
+
+          const mappedMovimientos = (movimientosApi || []).map(m => ({
+            fecha: m.fecha ? new Date(m.fecha).toLocaleString('es-PE') : 'Reciente',
+            insumo: m.insumo,
+            tipo: m.tipo,
+            cantidad: Number(m.cantidad || 0),
+            responsable: m.responsable,
+            motivo: m.motivo
+          }));
+
+          const cajaData = cajaApi ? [{
+            id: cajaApi.id,
+            usuario: cajaApi.usuario,
+            fecha_apertura: cajaApi.fechaApertura,
+            fecha_cierre: cajaApi.fechaCierre,
+            monto_apertura: Number(cajaApi.montoApertura || 0),
+            ingresos_ventas: Number(cajaApi.ingresosVentas || 0),
+            egresos_adicionales: Number(cajaApi.egresosAdicionales || 0),
+            monto_cierre: Number(cajaApi.montoCierre || 0),
+            estado: cajaApi.estado
+          }] : [...INITIAL_CAJA_HISTORY];
+
+          setInsumos(mappedInsumos.length ? mappedInsumos : [...DEFAULT_INSUMOS]);
+          setProductos(mappedProductos.length ? mappedProductos : [...DEFAULT_PRODUCTS]);
+          setRecetas({...DEFAULT_RECIPES});
+          setPedidos(mappedPedidos.length ? mappedPedidos : [...INITIAL_ORDERS]);
+          setMovimientos(mappedMovimientos.length ? mappedMovimientos : [...INITIAL_MOVIMIENTOS]);
+          setCajaSesiones(cajaData);
+          setCajaActiva(cajaData.find(s => s.estado === 'ABIERTA') || null);
+          if (resumenApi) {
+            showToast('Datos del backend cargados correctamente', 'success');
+          }
+        } catch (error) {
+          setInsumos([...DEFAULT_INSUMOS]);
+          setProductos([...DEFAULT_PRODUCTS]);
+          setRecetas({...DEFAULT_RECIPES});
+          setPedidos([...INITIAL_ORDERS]);
+          setMovimientos([...INITIAL_MOVIMIENTOS]);
+          setCajaSesiones([...INITIAL_CAJA_HISTORY]);
+          setCajaActiva(null);
+        }
+      }
+
+      const storedAuth = getStoredAuth();
+      if (storedAuth?.user) {
+        setCurrentUser(storedAuth.user);
+        setIsLoggedIn(true);
+        setActiveView(storedAuth.user.rol === 'ADMIN' ? 'reports' : 'pos');
+      }
+    };
+
+    loadInitialData();
   }, []);
 
   const saveToLocal = (updatedState) => {

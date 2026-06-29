@@ -63,6 +63,10 @@ public class InventarioServiceImpl implements InventarioService {
             ? insumo.getStockActual().add(request.getCantidad())
             : insumo.getStockActual().subtract(request.getCantidad());
 
+        if (newStock.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResourceNotFoundException("Stock insuficiente para registrar el movimiento");
+        }
+
         insumo.setStockActual(newStock);
         insumoRepository.save(insumo);
 
@@ -72,6 +76,7 @@ public class InventarioServiceImpl implements InventarioService {
         movimiento.setCantidad(request.getCantidad());
         movimiento.setMotivo(request.getMotivo());
         movimiento.setUsuario(usuario);
+        movimiento.setFecha(LocalDateTime.now());
         movimientoRepository.save(movimiento);
 
         return toResponse(movimiento);
@@ -106,89 +111,5 @@ public class InventarioServiceImpl implements InventarioService {
             receta.getInsumo().getNombre(),
             receta.getCantidadRequerida(),
             receta.getInsumo().getUnidadMedida().name());
-    }
-}package aquisito_broster_api.service.impl;
-
-import aquisito_broster_api.dto.inventario.InsumoResponse;
-import aquisito_broster_api.dto.inventario.MovimientoInventarioRequest;
-import aquisito_broster_api.entity.Insumo;
-import aquisito_broster_api.entity.MovimientoInventario;
-import aquisito_broster_api.entity.Usuario;
-import aquisito_broster_api.exception.ResourceNotFoundException;
-import aquisito_broster_api.repository.InsumoRepository;
-import aquisito_broster_api.repository.MovimientoInventarioRepository;
-import aquisito_broster_api.repository.UsuarioRepository;
-import aquisito_broster_api.service.InventarioService;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
-
-@Service
-public class InventarioServiceImpl implements InventarioService {
-
-    private final InsumoRepository insumoRepository;
-    private final MovimientoInventarioRepository movimientoRepository;
-    private final UsuarioRepository usuarioRepository;
-
-    public InventarioServiceImpl(InsumoRepository insumoRepository, MovimientoInventarioRepository movimientoRepository, UsuarioRepository usuarioRepository) {
-        this.insumoRepository = insumoRepository;
-        this.movimientoRepository = movimientoRepository;
-        this.usuarioRepository = usuarioRepository;
-    }
-
-    @Override
-    public List<InsumoResponse> listarInsumos() {
-        return insumoRepository.findAll().stream().map(this::toResponse).toList();
-    }
-
-    @Override
-    @Transactional
-    public MovimientoInventario registrarMovimiento(MovimientoInventarioRequest request) {
-        Insumo insumo = insumoRepository.findById(request.getInsumoId())
-            .orElseThrow(() -> new ResourceNotFoundException("Insumo no encontrado"));
-        Usuario usuario = usuarioRepository.findByUsername(request.getUsuarioUsername())
-            .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
-
-        BigDecimal nuevaCantidad = request.getTipo() == aquisito_broster_api.entity.TipoMovimiento.ENTRADA
-            ? insumo.getStockActual().add(request.getCantidad())
-            : insumo.getStockActual().subtract(request.getCantidad());
-
-        if (nuevaCantidad.compareTo(BigDecimal.ZERO) < 0) {
-            throw new ResourceNotFoundException("Stock insuficiente para registrar el movimiento");
-        }
-
-        insumo.setStockActual(nuevaCantidad);
-        insumoRepository.save(insumo);
-
-        MovimientoInventario movimiento = new MovimientoInventario();
-        movimiento.setInsumo(insumo);
-        movimiento.setTipo(request.getTipo());
-        movimiento.setCantidad(request.getCantidad());
-        movimiento.setMotivo(request.getMotivo());
-        movimiento.setUsuario(usuario);
-        movimiento.setFecha(LocalDateTime.now());
-        return movimientoRepository.save(movimiento);
-    }
-
-    @Override
-    public List<MovimientoInventario> listarMovimientosDelDia() {
-        LocalDateTime from = LocalDate.now().atStartOfDay();
-        LocalDateTime to = from.plusDays(1);
-        return movimientoRepository.findByFechaBetween(from, to);
-    }
-
-    private InsumoResponse toResponse(Insumo insumo) {
-        return new InsumoResponse(
-            insumo.getId(),
-            insumo.getNombre(),
-            insumo.getStockActual(),
-            insumo.getStockMinimo(),
-            insumo.getUnidadMedida().name(),
-            insumo.getStockActual().compareTo(insumo.getStockMinimo()) <= 0
-        );
     }
 }

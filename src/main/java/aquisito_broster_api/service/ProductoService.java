@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface ProductoService {
 
-    List<ProductoResponse> listar();
+    List<ProductoResponse> listAll();
 
     ProductoResponse crear(ProductoRequest request);
 

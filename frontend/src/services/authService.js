@@ -4,15 +4,11 @@ const getApiBaseUrl = () => {
   return import.meta.env.VITE_API_URL?.replace(/\/$/, '') || DEFAULT_API_BASE_URL;
 };
 
-const isBackendConfigured = () => Boolean(import.meta.env.VITE_API_URL);
+const isBackendConfigured = () => Boolean(import.meta.env.VITE_API_URL) || true;
 
 const buildLoginUrl = () => `${getApiBaseUrl()}/auth/login`;
 
 export async function loginWithJwt(username, password) {
-  if (!isBackendConfigured()) {
-    throw new Error('Backend no configurado. Define VITE_API_URL para activar JWT.');
-  }
-
   const response = await fetch(buildLoginUrl(), {
     method: 'POST',
     headers: {
