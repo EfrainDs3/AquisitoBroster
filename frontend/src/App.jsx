@@ -795,22 +795,6 @@ export default function App() {
             </li>
             <li class={activeView === 'pos' ? 'active' : ''}>
               <button onClick={() => setActiveView('pos')}><UtensilsCrossed size={16} /> POS Ventas</button>
-
-            <div className="login-module-preview">
-              {SYSTEM_MODULES.map(module => {
-                const ModuleIcon = module.icon;
-                return (
-                  <div key={module.key} className="login-module-chip">
-                    <ModuleIcon size={16} />
-                    <div>
-                      <strong>{module.title}</strong>
-                      <span>Acceso por rol: {module.roles.join(' / ')}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
             </li>
             <li class={activeView === 'kitchen' ? 'active' : ''}>
               <button onClick={() => setActiveView('kitchen')}><Flame size={16} /> Vista Cocina</button>
