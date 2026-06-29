@@ -25,8 +25,9 @@ import {
   TrendingDown
 } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
+import LoginScreen from './components/LoginScreen.jsx';
 import PosView from './components/PosView.jsx';
-import { clearStoredAuth } from './services/authService.js';
+import { clearStoredAuth, getStoredAuth, hasBackendConfigured, loginWithJwt, saveStoredAuth } from './services/authService.js';
 import { getProductos, getInsumos, getMovimientos, getPedidos, getCajaEstado, getResumenDiario } from './services/apiService.js';
 import { 
   Chart as ChartJS, 
@@ -144,9 +145,15 @@ const SYSTEM_MODULES = [
   }
 ];
 
+const QUICK_LOGIN_USERS = DEFAULT_USERS.map(user => ({
+  key: user.username,
+  demoUser: user
+}));
+
 export default function App() {
   // --- 1. ESTADOS PRINCIPALES ---
-  const [activeView, setActiveView] = useState(DEFAULT_USERS[0].rol === 'ADMIN' ? 'reports' : 'pos');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [activeView, setActiveView] = useState('pos');
   const [currentUser, setCurrentUser] = useState(DEFAULT_USERS[0]);
   const [insumos, setInsumos] = useState([]);
   const [productos, setProductos] = useState([]);
@@ -155,6 +162,10 @@ export default function App() {
   const [movimientos, setMovimientos] = useState([]);
   const [cajaSesiones, setCajaSesiones] = useState([]);
   const [cajaActiva, setCajaActiva] = useState(null);
+  
+  // Estado Login
+  const [loginUser, setLoginUser] = useState('');
+  const [loginPass, setLoginPass] = useState('');
   
   // Estados Auxiliares
   const [cart, setCart] = useState([]);
@@ -280,6 +291,12 @@ export default function App() {
         }
       }
 
+      const storedAuth = getStoredAuth();
+      if (storedAuth?.user) {
+        setCurrentUser(storedAuth.user);
+        setIsLoggedIn(true);
+        setActiveView(storedAuth.user.rol === 'ADMIN' ? 'reports' : 'pos');
+      }
     };
 
     loadInitialData();
@@ -329,8 +346,64 @@ export default function App() {
   };
 
   // --- INICIAR SESIÓN ---
+  const handleLoginSubmit = (e) => {
+    if (e) e.preventDefault();
+    if (!loginUser.trim()) {
+      showToast("Ingrese un nombre de usuario", "danger");
+      return;
+    }
+
+    const username = loginUser.trim().toLowerCase();
+
+    const completeLogin = (user, authToken) => {
+      setCurrentUser(user);
+      setIsLoggedIn(true);
+      setLoginUser('');
+      setLoginPass('');
+      setActiveView(user.rol === 'ADMIN' ? 'reports' : 'pos');
+      saveStoredAuth({ token: authToken || null, user });
+      showToast(`¡Bienvenido, ${user.nombre}!`, "success");
+    };
+
+    if (hasBackendConfigured()) {
+      loginWithJwt(username, loginPass)
+        .then((response) => {
+          const matchedUser = DEFAULT_USERS.find(u => u.username === (response.username || username)) || {
+            id: Date.now(),
+            username: response.username || username,
+            nombre: response.nombre || username,
+            rol: response.rol || 'CAJERO',
+            avatar: (response.nombre || username).charAt(0).toUpperCase()
+          };
+
+          completeLogin(matchedUser, response.token);
+        })
+        .catch((error) => {
+          showToast(error.message || 'No se pudo autenticar con el backend', 'danger');
+        });
+      return;
+    }
+
+    const foundUser = DEFAULT_USERS.find(u => u.username === username) ||
+      DEFAULT_USERS.find(u => u.rol.toLowerCase() === username);
+
+    if (foundUser) {
+      completeLogin(foundUser, null);
+    } else {
+      showToast("Usuario no encontrado (Prueba con: admin, cajero1, cocinero1)", "danger");
+    }
+  };
+
+  const handleQuickLogin = (userObj) => {
+    setCurrentUser(userObj);
+    setIsLoggedIn(true);
+    setActiveView(userObj.rol === 'ADMIN' ? 'reports' : 'pos');
+    saveStoredAuth({ token: null, user: userObj });
+    showToast(`¡Sesión iniciada como ${userObj.nombre}!`, "success");
+  };
 
   const handleLogout = () => {
+    setIsLoggedIn(false);
     setCart([]);
     clearStoredAuth();
     showToast("Sesión cerrada", "info");
@@ -688,7 +761,25 @@ export default function App() {
     return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   };
 
-  // --- RENDERIZADO PRINCIPAL: APP LAYOUT ---
+  // --- RENDERIZADO CONDICIONAL: PANTALLA DE LOGIN ---
+  if (!isLoggedIn) {
+    return (
+      <LoginScreen
+        loginUser={loginUser}
+        loginPass={loginPass}
+        setLoginUser={setLoginUser}
+        setLoginPass={setLoginPass}
+        onSubmit={handleLoginSubmit}
+        onQuickLogin={handleQuickLogin}
+        toastList={toastList}
+        previewModules={SYSTEM_MODULES}
+        quickUsers={DEFAULT_USERS}
+        backendConfigured={hasBackendConfigured()}
+      />
+    );
+  }
+
+  // --- RENDERIZADO CONDICIONAL: PANTALLA PRINCIPAL CON APP LAYOUT ---
   return (
     <div class="app-container">
       {/* SIDEBAR */}
