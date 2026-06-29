@@ -889,40 +889,6 @@ export default function App() {
               {/* VIEW: REPORTS (ADMIN DASHBOARD) */}
               {activeView === 'reports' && (
                 <div>
-                  <div className="module-hub-section">
-                    <div className="section-heading">
-                      <div>
-                        <span className="section-kicker">Módulos del sistema</span>
-                        <h3>Navegación rápida por áreas operativas</h3>
-                      </div>
-                    </div>
-                    <div className="module-hub-grid">
-                      {SYSTEM_MODULES.map(module => {
-                        const ModuleIcon = module.icon;
-                        const isActiveModule = activeView === module.target;
-                        const accessText = module.roles.length === 1 ? module.roles[0] : module.roles.join(' · ');
-
-                        return (
-                          <button
-                            key={module.key}
-                            type="button"
-                            className={`module-hub-card ${isActiveModule ? 'active' : ''}`}
-                            onClick={() => setActiveView(module.target)}
-                          >
-                            <div className="module-hub-icon">
-                              <ModuleIcon size={18} />
-                            </div>
-                            <div className="module-hub-copy">
-                              <strong>{module.title}</strong>
-                              <p>{module.description}</p>
-                            </div>
-                            <span className="module-hub-meta">{accessText}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
                   <div class="reports-grid-kpi">
                     <div class="kpi-card">
                       <div class="kpi-icon"><TrendingUp /></div>
