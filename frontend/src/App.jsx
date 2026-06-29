@@ -833,7 +833,7 @@ export default function App() {
         <header>
           <div class="header-title-section">
             <h2>
-              {activeView === 'reports' && 'Dashboard / Reportes'}
+              {activeView === 'reports' && 'Dashboard'}
               {activeView === 'pos' && 'Punto de Venta (POS)'}
               {activeView === 'kitchen' && 'Monitoreo de Cocina'}
               {activeView === 'inventory' && 'Gestión de Inventario y Recetas'}

@@ -14,7 +14,7 @@ export default function DashboardShell({
   moduleHub
 }) {
   const titleMap = {
-    reports: 'Dashboard / Reportes',
+    reports: 'Dashboard',
     pos: 'Punto de Venta (POS)',
     kitchen: 'Monitoreo de Cocina',
     inventory: 'Gestión de Inventario y Recetas',
