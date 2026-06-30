@@ -931,6 +931,34 @@ header {
     text-transform: capitalize;
 }
 
+.product-search-bar {
+    margin-bottom: 16px;
+}
+
+.product-search-bar input {
+    width: 100%;
+    max-width: 460px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    border-radius: 8px;
+    padding: 11px 14px;
+    font-size: 14px;
+    outline: none;
+    transition: var(--transition);
+}
+
+.product-search-bar input:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(255, 87, 34, 0.12);
+}
+
+.table-empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 28px 16px;
+}
+
 .table-actions {
     display: flex;
     align-items: center;

@@ -230,6 +230,7 @@ export default function App() {
   const [posCategoryFilter, setPosCategoryFilter] = useState('all');
   const [inventoryTab, setInventoryTab] = useState('insumos');
   const [inventoryMenuOpen, setInventoryMenuOpen] = useState(false);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
   const [cartCustomerName, setCartCustomerName] = useState('Cliente General');
   
   // Modales
@@ -262,6 +263,14 @@ export default function App() {
     recetas: 'Recetas / Fórmulas',
     movimientos: 'Kardex / Historial'
   };
+  const normalizedProductSearch = productSearchTerm.trim().toLowerCase();
+  const filteredProducts = normalizedProductSearch
+    ? productos.filter(producto => [
+        producto.nombre,
+        producto.desc,
+        producto.categoria
+      ].some(value => String(value || '').toLowerCase().includes(normalizedProductSearch)))
+    : productos;
 
   const loadInventoryFromBackend = async () => {
     const [insumosApi, movimientosApi] = await Promise.all([
@@ -1386,6 +1395,15 @@ export default function App() {
                     </button>
                   </div>
 
+                  <div class="product-search-bar">
+                    <input
+                      type="search"
+                      value={productSearchTerm}
+                      onChange={(e) => setProductSearchTerm(e.target.value)}
+                      placeholder="Buscar por nombre, descripción o categoría..."
+                    />
+                  </div>
+
                   <div class="table-responsive">
                     <table>
                       <thead>
@@ -1399,7 +1417,13 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {productos.map(producto => {
+                        {filteredProducts.length === 0 && (
+                          <tr>
+                            <td colSpan={6} class="table-empty-state">No se encontraron productos.</td>
+                          </tr>
+                        )}
+
+                        {filteredProducts.map(producto => {
                           const isAvailable = producto.disponible !== false;
                           return (
                             <tr key={producto.id}>
