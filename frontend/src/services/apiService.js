@@ -1,6 +1,6 @@
 import { getStoredAuth } from './authService.js';
 
-const DEFAULT_API_BASE_URL = '/api';
+const DEFAULT_API_BASE_URL = 'http://localhost:8080/api';
 
 const getApiBaseUrl = () => {
   return import.meta.env.VITE_API_URL?.replace(/\/$/, '') || DEFAULT_API_BASE_URL;
@@ -86,6 +86,8 @@ export const apiDelete = (path, options = {}) => requestJson(path, {
 export const getProductos = () => apiGet('/productos');
 export const getInsumos = () => apiGet('/inventario/insumos');
 export const getMovimientos = () => apiGet('/inventario/movimientos');
+export const getRecetasByProducto = (productoId) => apiGet(`/recetas?productoId=${encodeURIComponent(productoId)}`);
+export const registrarMovimientoInventario = (movimiento) => apiPost('/inventario/movimientos', movimiento);
 export const getPedidos = (estado) => apiGet(`/pedidos${estado ? `?estado=${estado}` : ''}`);
 export const getCajaEstado = (usuarioUsername) => apiGet(`/caja/estado${usuarioUsername ? `?usuarioUsername=${encodeURIComponent(usuarioUsername)}` : ''}`);
 export const getResumenDiario = () => apiGet('/reportes/resumen-diario');

@@ -9,6 +9,7 @@ import aquisito_broster_api.repository.ProductoRepository;
 import aquisito_broster_api.repository.RecetaRepository;
 import aquisito_broster_api.service.RecetaService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -26,6 +27,7 @@ public class RecetaServiceImpl implements RecetaService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<RecetaItemResponse> listarPorProducto(Long productoId) {
         return recetaRepository.findByProductoId(productoId).stream().map(this::toResponse).toList();
     }

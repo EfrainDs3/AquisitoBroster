@@ -28,7 +28,7 @@ import { Line } from 'react-chartjs-2';
 import LoginScreen from './components/LoginScreen.jsx';
 import PosView from './components/PosView.jsx';
 import { clearStoredAuth, getStoredAuth, hasBackendConfigured, loginWithJwt, saveStoredAuth } from './services/authService.js';
-import { getProductos, getInsumos, getMovimientos, getPedidos, getCajaEstado, getResumenDiario } from './services/apiService.js';
+import { getProductos, getInsumos, getMovimientos, getPedidos, getCajaEstado, getResumenDiario, getRecetasByProducto, registrarMovimientoInventario } from './services/apiService.js';
 import { 
   Chart as ChartJS, 
   CategoryScale, 
@@ -150,6 +150,45 @@ const QUICK_LOGIN_USERS = DEFAULT_USERS.map(user => ({
   demoUser: user
 }));
 
+const DEMO_PASSWORD_BY_USERNAME = {
+  admin: 'admin123',
+  cajero1: 'cajero123',
+  cocinero1: 'cocina123',
+  almacen1: 'almacen123'
+};
+
+const mapInsumoFromApi = (insumo) => ({
+  id: insumo.id,
+  nombre: insumo.nombre,
+  stock_actual: Number(insumo.stockActual ?? insumo.stock_actual ?? 0),
+  stock_minimo: Number(insumo.stockMinimo ?? insumo.stock_minimo ?? 0),
+  unidad_medida: insumo.unidadMedida || insumo.unidad_medida || 'UNIDAD'
+});
+
+const mapProductoFromApi = (producto) => ({
+  id: producto.id,
+  nombre: producto.nombre,
+  desc: producto.descripcion || producto.desc,
+  precio: Number(producto.precio || 0),
+  categoria: producto.categoria || 'general'
+});
+
+const mapMovimientoFromApi = (movimiento) => ({
+  fecha: movimiento.fecha ? new Date(movimiento.fecha).toLocaleString('es-PE') : 'Reciente',
+  insumo: movimiento.insumo,
+  tipo: movimiento.tipo,
+  cantidad: Number(movimiento.cantidad || 0),
+  responsable: movimiento.responsable,
+  motivo: movimiento.motivo
+});
+
+const mapRecetaFromApi = (receta) => ({
+  insumoId: receta.insumoId,
+  insumoNombre: receta.insumoNombre,
+  cantidad: Number(receta.cantidadRequerida ?? receta.cantidad ?? 0),
+  unidadMedida: receta.unidadMedida
+});
+
 export default function App() {
   // --- 1. ESTADOS PRINCIPALES ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -179,6 +218,7 @@ export default function App() {
   const [isInvMovOpen, setIsInvMovOpen] = useState(false);
   const [isLowStockOpen, setIsLowStockOpen] = useState(false);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [selectedRecipeProduct, setSelectedRecipeProduct] = useState(null);
   
   // Inputs de Formularios
   const [cajaMontoInicial, setCajaMontoInicial] = useState('150.00');
@@ -193,21 +233,72 @@ export default function App() {
   // Toasts
   const [toastList, setToastList] = useState([]);
 
+  const loadInventoryFromBackend = async () => {
+    const [insumosApi, movimientosApi] = await Promise.all([
+      getInsumos(),
+      getMovimientos()
+    ]);
+
+    const mappedInsumos = (insumosApi || []).map(mapInsumoFromApi);
+    const mappedMovimientos = (movimientosApi || []).map(mapMovimientoFromApi);
+
+    setInsumos(mappedInsumos);
+    setMovimientos(mappedMovimientos);
+
+    return { insumos: mappedInsumos, movimientos: mappedMovimientos };
+  };
+
+  const loadProductosFromBackend = async () => {
+    const productosApi = await getProductos();
+    const mappedProductos = (productosApi || []).map(mapProductoFromApi);
+    const catalogProductos = mappedProductos.length ? mappedProductos : [...DEFAULT_PRODUCTS];
+    setProductos(catalogProductos);
+    return catalogProductos;
+  };
+
+  const fetchRecetasFromBackend = async (productList) => {
+    const recipeEntries = await Promise.all(
+      productList.map(async (product) => {
+        const recetasApi = await getRecetasByProducto(product.id);
+        return [product.id, (recetasApi || []).map(mapRecetaFromApi)];
+      })
+    );
+
+    return Object.fromEntries(recipeEntries);
+  };
+
+  const loadRecetasFromBackend = async (productList = productos) => {
+    const mappedRecetas = await fetchRecetasFromBackend(productList);
+    setRecetas(mappedRecetas);
+    return mappedRecetas;
+  };
+
   // --- 2. CARGA Y PERSISTENCIA ---
   useEffect(() => {
     const loadInitialData = async () => {
       const savedState = localStorage.getItem('aquicito_broaster_react_state');
       if (savedState) {
         const parsed = JSON.parse(savedState);
-        setInsumos(parsed.insumos || [...DEFAULT_INSUMOS]);
         setProductos(parsed.productos || [...DEFAULT_PRODUCTS]);
         setRecetas(parsed.recetas || {...DEFAULT_RECIPES});
         setPedidos(parsed.pedidos || [...INITIAL_ORDERS]);
-        setMovimientos(parsed.movimientos || [...INITIAL_MOVIMIENTOS]);
         setCajaSesiones(parsed.cajaSesiones || [...INITIAL_CAJA_HISTORY]);
         
         const activa = (parsed.cajaSesiones || []).find(s => s.estado === 'ABIERTA');
         setCajaActiva(activa || null);
+
+        try {
+          const backendProductos = await loadProductosFromBackend();
+          await Promise.all([
+            loadInventoryFromBackend(),
+            loadRecetasFromBackend(backendProductos)
+          ]);
+        } catch (error) {
+          setInsumos([...DEFAULT_INSUMOS]);
+          setMovimientos([...INITIAL_MOVIMIENTOS]);
+          setRecetas(parsed.recetas || {...DEFAULT_RECIPES});
+          showToast('No se pudo conectar inventario con la base de datos. Se muestran datos de respaldo.', 'warning');
+        }
       } else {
         try {
           const [productosApi, insumosApi, pedidosApi, movimientosApi, cajaApi, resumenApi] = await Promise.all([
@@ -219,21 +310,11 @@ export default function App() {
             getResumenDiario()
           ]);
 
-          const mappedProductos = (productosApi || []).map(p => ({
-            id: p.id,
-            nombre: p.nombre,
-            desc: p.descripcion || p.desc,
-            precio: Number(p.precio || 0),
-            categoria: p.categoria || 'general'
-          }));
+          const mappedProductos = (productosApi || []).map(mapProductoFromApi);
+          const catalogProductos = mappedProductos.length ? mappedProductos : [...DEFAULT_PRODUCTS];
+          const mappedRecetas = await fetchRecetasFromBackend(catalogProductos);
 
-          const mappedInsumos = (insumosApi || []).map(i => ({
-            id: i.id,
-            nombre: i.nombre,
-            stock_actual: Number(i.stockActual || 0),
-            stock_minimo: Number(i.stockMinimo || 0),
-            unidad_medida: i.unidadMedida || 'UNIDAD'
-          }));
+          const mappedInsumos = (insumosApi || []).map(mapInsumoFromApi);
 
           const mappedPedidos = (pedidosApi || []).map(p => ({
             id: p.id,
@@ -249,14 +330,7 @@ export default function App() {
             }))
           }));
 
-          const mappedMovimientos = (movimientosApi || []).map(m => ({
-            fecha: m.fecha ? new Date(m.fecha).toLocaleString('es-PE') : 'Reciente',
-            insumo: m.insumo,
-            tipo: m.tipo,
-            cantidad: Number(m.cantidad || 0),
-            responsable: m.responsable,
-            motivo: m.motivo
-          }));
+          const mappedMovimientos = (movimientosApi || []).map(mapMovimientoFromApi);
 
           const cajaData = cajaApi ? [{
             id: cajaApi.id,
@@ -271,8 +345,8 @@ export default function App() {
           }] : [...INITIAL_CAJA_HISTORY];
 
           setInsumos(mappedInsumos.length ? mappedInsumos : [...DEFAULT_INSUMOS]);
-          setProductos(mappedProductos.length ? mappedProductos : [...DEFAULT_PRODUCTS]);
-          setRecetas({...DEFAULT_RECIPES});
+          setProductos(catalogProductos);
+          setRecetas(Object.keys(mappedRecetas).length ? mappedRecetas : {...DEFAULT_RECIPES});
           setPedidos(mappedPedidos.length ? mappedPedidos : [...INITIAL_ORDERS]);
           setMovimientos(mappedMovimientos.length ? mappedMovimientos : [...INITIAL_MOVIMIENTOS]);
           setCajaSesiones(cajaData);
@@ -301,6 +375,27 @@ export default function App() {
 
     loadInitialData();
   }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn || activeView !== 'inventory') return;
+
+    loadInventoryFromBackend().catch(() => {
+      showToast('No se pudo actualizar inventario desde la base de datos', 'danger');
+    });
+  }, [activeView, isLoggedIn]);
+
+  useEffect(() => {
+    if (!isLoggedIn || activeView !== 'inventory' || inventoryTab !== 'recetas') return;
+
+    const loadProductsAndRecipes = async () => {
+      const backendProductos = await loadProductosFromBackend();
+      await loadRecetasFromBackend(backendProductos);
+    };
+
+    loadProductsAndRecipes().catch(() => {
+      showToast('No se pudo actualizar recetas desde la base de datos', 'danger');
+    });
+  }, [activeView, inventoryTab, isLoggedIn]);
 
   const saveToLocal = (updatedState) => {
     localStorage.setItem('aquicito_broaster_react_state', JSON.stringify(updatedState));
@@ -394,12 +489,33 @@ export default function App() {
     }
   };
 
-  const handleQuickLogin = (userObj) => {
-    setCurrentUser(userObj);
-    setIsLoggedIn(true);
-    setActiveView(userObj.rol === 'ADMIN' ? 'reports' : 'pos');
-    saveStoredAuth({ token: null, user: userObj });
-    showToast(`¡Sesión iniciada como ${userObj.nombre}!`, "success");
+  const handleQuickLogin = async (userObj) => {
+    const completeQuickLogin = (authToken = null, user = userObj) => {
+      setCurrentUser(user);
+      setIsLoggedIn(true);
+      setActiveView(user.rol === 'ADMIN' ? 'reports' : 'pos');
+      saveStoredAuth({ token: authToken, user });
+      showToast(`Sesion iniciada como ${user.nombre}`, "success");
+    };
+
+    if (hasBackendConfigured()) {
+      try {
+        const response = await loginWithJwt(userObj.username, DEMO_PASSWORD_BY_USERNAME[userObj.username]);
+        const backendUser = {
+          ...userObj,
+          username: response.username || userObj.username,
+          nombre: response.nombre || userObj.nombre,
+          rol: response.rol || userObj.rol,
+          avatar: (response.nombre || userObj.nombre).charAt(0).toUpperCase()
+        };
+        completeQuickLogin(response.token, backendUser);
+        return;
+      } catch (error) {
+        showToast(error.message || 'No se pudo autenticar con el backend. Se usara sesion local.', 'warning');
+      }
+    }
+
+    completeQuickLogin();
   };
 
   const handleLogout = () => {
@@ -586,7 +702,7 @@ export default function App() {
     setIsInvMovOpen(true);
   };
 
-  const handleRegisterInvMovement = () => {
+  const handleRegisterInvMovement = async () => {
     const id = parseInt(invMovInsumoId);
     const qty = parseFloat(invMovCantidad);
     if (isNaN(qty) || qty <= 0) {
@@ -595,43 +711,30 @@ export default function App() {
     }
 
     const targetInsumo = insumos.find(i => i.id === id);
-    if (invMovType === 'MERMA' && targetInsumo.stock_actual < qty) {
-      showToast("No puede reportar más mermas del stock real", "danger");
+    if (!targetInsumo) {
+      showToast("Seleccione un insumo valido", "danger");
       return;
     }
 
-    const updatedInsumos = insumos.map(i => {
-      if (i.id === id) {
-        return {
-          ...i,
-          stock_actual: invMovType === 'ENTRADA' ? i.stock_actual + qty : i.stock_actual - qty
-        };
-      }
-      return i;
-    });
+    if (invMovType === 'MERMA' && targetInsumo.stock_actual < qty) {
+      showToast("No puede reportar mas mermas del stock real", "danger");
+      return;
+    }
 
-    const newMov = {
-      fecha: getNowString(),
-      insumo: targetInsumo.nombre,
-      tipo: invMovType,
-      cantidad: qty,
-      responsable: currentUser.nombre,
-      motivo: invMovMotivo || (invMovType === 'ENTRADA' ? 'Ingreso de mercadería' : 'Merma de cocina')
-    };
+    try {
+      await registrarMovimientoInventario({
+        insumoId: id,
+        tipo: invMovType,
+        cantidad: qty,
+        motivo: invMovMotivo || (invMovType === 'ENTRADA' ? 'Ingreso de mercaderia' : 'Merma de cocina')
+      });
 
-    const updatedMovs = [...movimientos, newMov];
-    setInsumos(updatedInsumos);
-    setMovimientos(updatedMovs);
-    
-    const currentState = {
-      productos, recetas, pedidos, cajaSesiones,
-      insumos: updatedInsumos,
-      movimientos: updatedMovs
-    };
-    saveToLocal(currentState);
-
-    setIsInvMovOpen(false);
-    showToast("Movimiento de inventario guardado correctamente", "success");
+      await loadInventoryFromBackend();
+      setIsInvMovOpen(false);
+      showToast("Movimiento de inventario guardado en la base de datos", "success");
+    } catch (error) {
+      showToast(error.message || "No se pudo guardar el movimiento en la base de datos", "danger");
+    }
   };
 
   // --- LÓGICA DE CAJA ---
@@ -1165,35 +1268,24 @@ export default function App() {
                   )}
 
                   {inventoryTab === 'recetas' && (
-                    <div class="table-responsive">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Producto</th>
-                            <th>Ingrediente</th>
-                            <th>Descuento Fijo</th>
-                            <th>Unidad</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {productos.map(p => {
-                            const recipe = recetas[p.id] || [];
-                            return recipe.map((ing, idx) => {
-                              const itemInsumo = insumos.find(i => i.id === ing.insumoId);
-                              return (
-                                <tr key={`${p.id}-${ing.insumoId}`}>
-                                  {idx === 0 && (
-                                    <td rowSpan={recipe.length} style={{ fontWeight: '600', verticalAlign: 'top' }}>{p.nombre}</td>
-                                  )}
-                                  <td>{itemInsumo?.nombre}</td>
-                                  <td style={{ color: 'var(--accent-light)', fontWeight: '700' }}>{ing.cantidad.toFixed(3)}</td>
-                                  <td>{itemInsumo?.unidad_medida}</td>
-                                </tr>
-                              );
-                            });
-                          })}
-                        </tbody>
-                      </table>
+                    <div class="recipe-card-grid">
+                      {productos.map(p => (
+                        <div class="recipe-product-card" key={p.id}>
+                          <div class="recipe-product-image">
+                            <Drumstick size={48} />
+                          </div>
+                          <div class="recipe-product-body">
+                            <h3>{p.nombre}</h3>
+                            <p>{p.desc || 'Producto sin descripcion registrada.'}</p>
+                          </div>
+                          <div class="recipe-product-footer">
+                            <span class="recipe-product-price">S/. {p.precio.toFixed(2)}</span>
+                            <button class="btn btn-secondary" onClick={() => setSelectedRecipeProduct(p)}>
+                              Ver ingredientes
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
 
@@ -1405,6 +1497,55 @@ export default function App() {
             <div class="modal-footer">
               <button class="btn btn-secondary" onClick={() => setIsInvMovOpen(false)}>Cancelar</button>
               <button class="btn btn-success" onClick={handleRegisterInvMovement}>Guardar Movimiento</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: INGREDIENTES DE RECETA */}
+      {selectedRecipeProduct && (
+        <div class="modal-overlay">
+          <div class="modal-card recipe-detail-modal">
+            <div class="modal-header">
+              <h3>{selectedRecipeProduct.nombre}</h3>
+              <button class="modal-close" onClick={() => setSelectedRecipeProduct(null)}><X size={18} /></button>
+            </div>
+            <div class="modal-body">
+              <div class="recipe-detail-hero">
+                <div class="recipe-detail-image">
+                  <Drumstick size={42} />
+                </div>
+                <div>
+                  <p>{selectedRecipeProduct.desc || 'Producto sin descripcion registrada.'}</p>
+                  <strong>S/. {selectedRecipeProduct.precio.toFixed(2)}</strong>
+                </div>
+              </div>
+
+              <div class="recipe-ingredients-list">
+                <div class="recipe-ingredients-heading">
+                  <span>Insumo</span>
+                  <span>Cantidad requerida</span>
+                  <span>Unidad</span>
+                </div>
+
+                {(recetas[selectedRecipeProduct.id] || []).length === 0 ? (
+                  <div class="recipe-empty-state">Sin ingredientes registrados en la base de datos.</div>
+                ) : (
+                  (recetas[selectedRecipeProduct.id] || []).map(ing => {
+                    const itemInsumo = insumos.find(i => i.id === ing.insumoId);
+                    return (
+                      <div class="recipe-ingredient-row" key={`${selectedRecipeProduct.id}-${ing.insumoId}`}>
+                        <span>{ing.insumoNombre || itemInsumo?.nombre}</span>
+                        <strong>{ing.cantidad.toFixed(3)}</strong>
+                        <span>{ing.unidadMedida || itemInsumo?.unidad_medida}</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" onClick={() => setSelectedRecipeProduct(null)}>Cerrar</button>
             </div>
           </div>
         </div>

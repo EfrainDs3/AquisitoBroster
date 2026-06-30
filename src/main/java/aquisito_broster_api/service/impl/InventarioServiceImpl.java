@@ -83,6 +83,7 @@ public class InventarioServiceImpl implements InventarioService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<RecetaItemResponse> listRecetaByProducto(Long productoId) {
         return recetaRepository.findByProductoId(productoId).stream()
             .map(this::toResponse)

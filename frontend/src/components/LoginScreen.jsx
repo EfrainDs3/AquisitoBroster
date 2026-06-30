@@ -10,17 +10,17 @@ export default function LoginScreen({
   toastList
 }) {
   return (
-    <div class="login-overlay">
-      <div class="login-card">
-        <div class="login-logo">
+    <div className="login-overlay">
+      <div className="login-card">
+        <div className="login-logo">
           <Drumstick size={32} />
         </div>
         <h2>Aquicito Broaster</h2>
         <p>Sistema Integral de Gestión de Ventas e Inventario</p>
 
         <form onSubmit={onSubmit}>
-          <div class="login-form">
-            <div class="input-group">
+          <div className="login-form">
+            <div className="input-group">
               <label>Nombre de Usuario</label>
               <input
                 type="text"
@@ -30,7 +30,7 @@ export default function LoginScreen({
                 required
               />
             </div>
-            <div class="input-group" style={{ marginBottom: '20px' }}>
+            <div className="input-group" style={{ marginBottom: '20px' }}>
               <label>Contraseña</label>
               <input
                 type="password"
@@ -39,16 +39,16 @@ export default function LoginScreen({
                 placeholder="••••••••"
               />
             </div>
-            <button type="submit" class="btn" style={{ width: '100%', justifyContent: 'center' }}>
+            <button type="submit" className="btn" style={{ width: '100%', justifyContent: 'center' }}>
               Ingresar al Sistema <ArrowRight size={16} />
             </button>
           </div>
         </form>
       </div>
 
-      <div class="toast-container">
+      <div className="toast-container">
         {toastList.map(t => (
-          <div key={t.id} class={`toast toast-${t.type}`}>
+          <div key={t.id} className={`toast toast-${t.type}`}>
             <span>{t.message}</span>
           </div>
         ))}
