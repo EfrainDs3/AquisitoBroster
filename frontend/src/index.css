@@ -98,12 +98,51 @@ aside {
     transition: var(--transition);
 }
 
-.sidebar-menu button:hover, .sidebar-menu li.active button {
+.sidebar-menu button:hover, .sidebar-menu li.active > button {
     background-color: var(--bg-tertiary);
     color: var(--text-main);
 }
 
-.sidebar-menu li.active button svg {
+.sidebar-menu li.active > button svg {
+    color: var(--accent-primary);
+}
+
+.sidebar-parent > button span {
+    flex: 1;
+}
+
+.sidebar-chevron {
+    margin-left: auto;
+    transition: transform 0.2s ease;
+}
+
+.sidebar-parent.open .sidebar-chevron {
+    transform: rotate(90deg);
+}
+
+.sidebar-submenu {
+    list-style: none;
+    margin: 4px 0 8px 18px;
+    padding-left: 12px;
+    border-left: 1px solid var(--border-color);
+}
+
+.sidebar-submenu li {
+    margin-bottom: 4px;
+}
+
+.sidebar-submenu button {
+    padding: 9px 12px;
+    font-size: 13px;
+    border-radius: 6px;
+}
+
+.sidebar-submenu li.active > button {
+    background-color: rgba(255, 87, 34, 0.14);
+    color: var(--text-main);
+}
+
+.sidebar-submenu li.active > button svg {
     color: var(--accent-primary);
 }
 
@@ -848,6 +887,13 @@ header {
 }
 
 /* TABS E INVENTARIO */
+.inventory-view-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
 .tabs-header {
     display: flex;
     gap: 12px;
@@ -871,6 +917,31 @@ header {
     color: var(--accent-primary);
     border-bottom-color: var(--accent-primary);
     outline: none;
+}
+
+.product-description-cell {
+    max-width: 460px;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+.product-category-badge {
+    background-color: rgba(255, 87, 34, 0.16);
+    color: var(--accent-light);
+    text-transform: capitalize;
+}
+
+.table-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-icon-sm {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    justify-content: center;
 }
 
 .table-responsive {
@@ -1233,6 +1304,29 @@ tr:last-child td {
 
 .modal-body {
     padding: 20px;
+}
+
+.product-modal-card {
+    max-width: 640px;
+}
+
+.confirm-modal-card {
+    max-width: 420px;
+}
+
+.product-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.product-form-full {
+    grid-column: 1 / -1;
+}
+
+.confirm-modal-message {
+    color: var(--text-muted);
+    line-height: 1.5;
 }
 
 .modal-footer {

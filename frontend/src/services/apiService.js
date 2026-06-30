@@ -91,3 +91,5 @@ export const registrarMovimientoInventario = (movimiento) => apiPost('/inventari
 export const getPedidos = (estado) => apiGet(`/pedidos${estado ? `?estado=${estado}` : ''}`);
 export const getCajaEstado = (usuarioUsername) => apiGet(`/caja/estado${usuarioUsername ? `?usuarioUsername=${encodeURIComponent(usuarioUsername)}` : ''}`);
 export const getResumenDiario = () => apiGet('/reportes/resumen-diario');
+export const crearProducto = (producto) => apiPost('/productos', producto);
+export const actualizarProducto = (id, producto) => apiPut(`/productos/${encodeURIComponent(id)}`, producto);
